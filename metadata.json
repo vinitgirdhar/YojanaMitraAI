@@ -1,0 +1,7 @@
+{
+  "name": "YojanaMitra AI",
+  "description": "An AI-powered dashboard for Indian citizens to discover government schemes and manage documentation with a simple, accessible interface.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
