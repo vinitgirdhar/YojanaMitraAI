@@ -1,12 +1,23 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
-// Always use the named parameter for API key and rely on process.env.API_KEY.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Lazy-initialize so the app doesn't crash when no API key is set.
+let ai: GoogleGenAI | null = null;
+
+function getAI(): GoogleGenAI {
+  if (!ai) {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+      throw new Error("Gemini API key is not configured. Please set GEMINI_API_KEY in a .env file.");
+    }
+    ai = new GoogleGenAI({ apiKey });
+  }
+  return ai;
+}
 
 export async function askYojanaMitra(query: string, userContext?: any) {
   try {
-    const response = await ai.models.generateContent({
+    const response = await getAI().models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `You are YojanaMitra AI, an expert assistant for Indian Government Schemes. 
             User context: ${JSON.stringify(userContext || {})}
