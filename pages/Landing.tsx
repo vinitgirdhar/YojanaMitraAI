@@ -129,6 +129,9 @@ const Landing: React.FC<LandingProps> = ({ onLogin }) => {
                   Didn't receive code? <button type="button" className="text-[#FF9933] font-bold hover:underline">Resend in 30s</button>
                 </p>
               </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-center">
+                <p className="text-xs text-blue-700 font-medium">🔑 Demo Mode: Use OTP <span className="font-bold tracking-widest text-[#003366]">123456</span> to login</p>
+              </div>
               <button
                 type="submit"
                 className="w-full bg-[#FF9933] hover:bg-[#e68a2e] text-white py-4 rounded-2xl font-bold text-lg shadow-xl shadow-orange-900/10 flex items-center justify-center gap-2 transition-all active:scale-95"
