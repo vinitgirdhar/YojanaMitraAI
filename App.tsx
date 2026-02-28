@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { 
   Home, 
@@ -13,6 +13,7 @@ import {
   LogOut,
   Globe
 } from 'lucide-react';
+import { Amplify } from 'aws-amplify';
 
 import Landing from './pages/Landing';
 import ProfileSetup from './pages/ProfileSetup';
@@ -23,6 +24,15 @@ import SchemeDetail from './pages/SchemeDetail';
 import Redirect from './pages/Redirect';
 import VoiceAssistant from './components/VoiceAssistant';
 import { Language, UserProfile, UserCategory } from './types';
+import { getCognitoConfig } from './services/authService';
+import { isAuthenticated, getCurrentUser, signOut } from './services/authService';
+
+// Initialize Amplify with Cognito configuration
+try {
+  Amplify.configure(getCognitoConfig());
+} catch (error) {
+  console.warn('Amplify configuration incomplete - will use fallback auth', error);
+}
 
 const NavItem: React.FC<{ to: string, icon: any, label: string, active: boolean }> = ({ to, icon: Icon, label, active }) => (
   <Link 
@@ -36,7 +46,7 @@ const NavItem: React.FC<{ to: string, icon: any, label: string, active: boolean 
   </Link>
 );
 
-const AppLayout: React.FC<{ children: React.ReactNode, profile: UserProfile | null }> = ({ children, profile }) => {
+const AppLayout: React.FC<{ children: React.ReactNode, profile: UserProfile | null, onLogout: () => void }> = ({ children, profile, onLogout }) => {
   const location = useLocation();
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -106,6 +116,14 @@ const AppLayout: React.FC<{ children: React.ReactNode, profile: UserProfile | nu
               <div className="w-10 h-10 bg-[#FF9933] rounded-full flex items-center justify-center text-white font-bold shadow-md">
                 {profile?.name?.charAt(0) || 'U'}
               </div>
+              {/* Logout Button */}
+              <button
+                onClick={onLogout}
+                className="ml-4 p-2 hover:bg-gray-100 rounded-lg transition"
+                title="Logout"
+              >
+                <LogOut className="w-5 h-5 text-gray-600" />
+              </button>
             </div>
           </div>
         </header>
@@ -141,14 +159,74 @@ const AppLayout: React.FC<{ children: React.ReactNode, profile: UserProfile | nu
 const App: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleLogin = () => {
+  // Initialize auth state on app load
+  useEffect(() => {
+    const initAuth = () => {
+      // Check if user is already authenticated (fallback: check localStorage/sessionStorage)
+      const authToken = sessionStorage.getItem('authToken');
+      const userStr = sessionStorage.getItem('user');
+      const profileStr = localStorage.getItem('userProfile');
+
+      if (authToken && userStr) {
+        setIsLoggedIn(true);
+        
+        if (profileStr) {
+          try {
+            setProfile(JSON.parse(profileStr));
+          } catch (e) {
+            console.error('Error parsing stored profile:', e);
+          }
+        }
+      }
+      setIsLoading(false);
+    };
+
+    initAuth();
+  }, []);
+
+  const handleLogin = (amplifyUser?: any) => {
     setIsLoggedIn(true);
+    // If Amplify user object is provided, store it
+    if (amplifyUser) {
+      sessionStorage.setItem('user', JSON.stringify(amplifyUser));
+    }
   };
 
   const handleProfileComplete = (newProfile: UserProfile) => {
     setProfile(newProfile);
+    // Persist profile to localStorage for persistence across sessions
+    localStorage.setItem('userProfile', JSON.stringify(newProfile));
   };
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+    
+    // Clear local state
+    setIsLoggedIn(false);
+    setProfile(null);
+    localStorage.removeItem('userProfile');
+    sessionStorage.removeItem('user');
+    sessionStorage.removeItem('authToken');
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block p-3 bg-[#FF9933] rounded-full mb-4">
+            <LayoutDashboard className="w-6 h-6 text-white animate-spin" />
+          </div>
+          <p className="text-gray-600">Loading YojanaMitra...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Router>
@@ -161,7 +239,7 @@ const App: React.FC = () => {
           path="/dashboard" 
           element={
             isLoggedIn && profile ? (
-              <AppLayout profile={profile}>
+              <AppLayout profile={profile} onLogout={handleLogout}>
                 <Dashboard profile={profile} />
               </AppLayout>
             ) : <Navigate to="/" />
@@ -171,7 +249,7 @@ const App: React.FC = () => {
           path="/docs" 
           element={
             isLoggedIn && profile ? (
-              <AppLayout profile={profile}>
+              <AppLayout profile={profile} onLogout={handleLogout}>
                 <Documentation />
               </AppLayout>
             ) : <Navigate to="/" />
@@ -181,7 +259,7 @@ const App: React.FC = () => {
           path="/schemes" 
           element={
             isLoggedIn && profile ? (
-              <AppLayout profile={profile}>
+              <AppLayout profile={profile} onLogout={handleLogout}>
                 <Schemes userProfile={profile} />
               </AppLayout>
             ) : <Navigate to="/" />
@@ -191,7 +269,7 @@ const App: React.FC = () => {
           path="/schemes/:id" 
           element={
             isLoggedIn && profile ? (
-              <AppLayout profile={profile}>
+              <AppLayout profile={profile} onLogout={handleLogout}>
                 <SchemeDetail />
               </AppLayout>
             ) : <Navigate to="/" />
@@ -201,7 +279,7 @@ const App: React.FC = () => {
           path="/redirect" 
           element={
             isLoggedIn && profile ? (
-              <AppLayout profile={profile}>
+              <AppLayout profile={profile} onLogout={handleLogout}>
                 <Redirect />
               </AppLayout>
             ) : <Navigate to="/" />
